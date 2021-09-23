@@ -438,6 +438,7 @@ pub extern fn quiche_conn_recv(
 #[no_mangle]
 pub extern fn quiche_conn_send(
     conn: &mut Connection, out: *mut u8, out_len: size_t,
+    stream_blocks_ptr: *mut *mut crate::stream::Block, stream_blocks_num: *mut size_t
 ) -> ssize_t {
     if out_len > <ssize_t>::max_value() as usize {
         panic!("The provided buffer is too large");
@@ -445,11 +446,27 @@ pub extern fn quiche_conn_send(
 
     let out = unsafe { slice::from_raw_parts_mut(out, out_len) };
 
-    match conn.send(out) {
+    let mut stream_blocks = Some(vec![]);
+    let ret = match conn.send(out, &mut stream_blocks) {
         Ok(v) => v as ssize_t,
 
         Err(e) => e.to_c(),
+    };
+    if stream_blocks_ptr.is_null() {
+        return ret;
     }
+    if stream_blocks.is_some() {
+        let mut blocks = stream_blocks.unwrap();
+        blocks.shrink_to_fit();
+        unsafe {
+            *stream_blocks_ptr = blocks.as_mut_ptr();
+            *stream_blocks_num = blocks.len();
+        }
+        std::mem::forget(blocks);
+    } else {
+        unreachable!();
+    }
+    return ret;
 }
 
 #[no_mangle]

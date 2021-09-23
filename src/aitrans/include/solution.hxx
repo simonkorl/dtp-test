@@ -20,7 +20,7 @@ extern "C" {
         uint64_t block_id;
         uint64_t block_deadline; // ms
         uint64_t block_priority;
-        uint64_t block_create_time; // ms 
+        uint64_t block_create_time; // ms
         uint64_t block_size; // Bytes
         uint64_t remaining_size; //Bytes
     };

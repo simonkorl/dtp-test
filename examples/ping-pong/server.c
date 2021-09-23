@@ -85,17 +85,31 @@ static void debug_log(const char *line, void *argp) {
 static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
   static uint8_t out[MAX_DATAGRAM_SIZE];
 
-  while (1) {
-    ssize_t written = quiche_conn_send(conn_io->conn, out, sizeof(out));
+  struct Block *stream_blocks = NULL;
+  size_t stream_blocks_num = 0;
 
-    if (written == QUICHE_ERR_DONE) {
-      fprintf(stderr, "done writing\n");
-      break;
+  while (1) {
+    stream_blocks_num = 0;
+      ssize_t written = quiche_conn_send(conn_io->conn, out, sizeof(out),
+                                         &stream_blocks, &stream_blocks_num);
+
+      if (written == QUICHE_ERR_DONE) {
+          fprintf(stderr, "done writing\n");
+          break;
     }
 
     if (written < 0) {
       fprintf(stderr, "failed to create packet: %zd\n", written);
       return;
+    }
+    // demo usage of stream_blocks infos
+    if (stream_blocks_num > 0) {
+        for (int i = 0; i < stream_blocks_num; ++i) {
+            printf("%d: stream_id: %ld, ddl: %ld, priority: %ld\n", i,
+                   stream_blocks[i].block_id, stream_blocks[i].block_deadline,
+                   stream_blocks[i].block_priority);
+        }
+        free(stream_blocks);
     }
 
     ssize_t sent =

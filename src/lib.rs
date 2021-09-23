@@ -1733,7 +1733,7 @@ impl Connection {
     /// }
     /// # Ok::<(), quiche::Error>(())
     /// ```
-    pub fn send(&mut self, out: &mut [u8]) -> Result<usize> {
+    pub fn send(&mut self, out: &mut [u8], stream_blocks: &mut Option<Vec<crate::stream::Block>>) -> Result<usize> {
         let mut now = time::Instant::now();
 
         if out.is_empty() {
@@ -2230,6 +2230,10 @@ impl Connection {
                     now_time_ms as u64,
                 )? {
                     let block = self.streams.get_block(stream_id);
+                    match stream_blocks.as_mut() {
+                        Some(blocks) => blocks.push(block),
+                        None => {}
+                    }
                     let stream = match self.streams.get_mut(stream_id) {
                         Some(v) => v,
 
@@ -2384,7 +2388,6 @@ impl Connection {
                     break;
                 }
             }
-
             // Create PING for PTO probe.
             if self.recovery.loss_probes[epoch] > 0 &&
                 !ack_eliciting &&
@@ -4132,7 +4135,7 @@ pub mod testing {
         }
 
         pub fn handshake(&mut self, buf: &mut [u8]) -> Result<()> {
-            let mut len = self.client.send(buf)?;
+            let mut len = self.client.send(buf, &mut None)?;
 
             while !self.client.is_established() && !self.server.is_established() {
                 len = recv_send(&mut self.server, buf, len)?;
@@ -4146,7 +4149,7 @@ pub mod testing {
 
         pub fn flush_client(&mut self, buf: &mut [u8]) -> Result<()> {
             loop {
-                let len = match self.client.send(buf) {
+                let len = match self.client.send(buf, &mut None) {
                     Ok(v) => v,
 
                     Err(Error::Done) => break,
@@ -4168,7 +4171,7 @@ pub mod testing {
 
         pub fn flush_server(&mut self, buf: &mut [u8]) -> Result<()> {
             loop {
-                let len = match self.server.send(buf) {
+                let len = match self.server.send(buf, &mut None) {
                     Ok(v) => v,
 
                     Err(Error::Done) => break,
@@ -4234,7 +4237,7 @@ pub mod testing {
         let mut off = 0;
 
         while off < buf.len() {
-            match conn.send(&mut buf[off..]) {
+            match conn.send(&mut buf[off..], &mut None) {
                 Ok(write) => off += write,
 
                 Err(Error::Done) => break,
@@ -4402,7 +4405,7 @@ mod tests {
 
         let mut pipe = testing::Pipe::with_client_config(&mut config).unwrap();
 
-        let mut len = pipe.client.send(&mut buf).unwrap();
+        let mut len = pipe.client.send(&mut buf, &mut None).unwrap();
 
         let hdr = packet::Header::from_slice(&mut buf[..len], 0).unwrap();
         len = crate::negotiate_version(&hdr.scid, &hdr.dcid, &mut buf).unwrap();
@@ -4433,7 +4436,7 @@ mod tests {
         let mut pipe = testing::Pipe::default().unwrap();
 
         // Client sends initial flight.
-        let mut len = pipe.client.send(&mut buf).unwrap();
+        let mut len = pipe.client.send(&mut buf,&mut None).unwrap();
 
         // Server sends initial flight.
         len = testing::recv_send(&mut pipe.server, &mut buf, len).unwrap();
@@ -4516,7 +4519,7 @@ mod tests {
 
         let mut pipe = testing::Pipe::with_server_config(&mut config).unwrap();
 
-        let client_sent = pipe.client.send(&mut buf).unwrap();
+        let client_sent = pipe.client.send(&mut buf,&mut None).unwrap();
         let server_sent =
             testing::recv_send(&mut pipe.server, &mut buf, client_sent).unwrap();
 
@@ -5038,7 +5041,7 @@ mod tests {
         let mut pipe = testing::Pipe::default().unwrap();
 
         // Client sends initial flight
-        let mut len = pipe.client.send(&mut buf).unwrap();
+        let mut len = pipe.client.send(&mut buf,&mut None).unwrap();
 
         // Server sends initial flight..
         len = testing::recv_send(&mut pipe.server, &mut buf, len).unwrap();
@@ -5740,7 +5743,7 @@ mod tests {
         let mut pipe = testing::Pipe::default().unwrap();
 
         // Client sends initial flight.
-        let mut len = pipe.client.send(&mut buf).unwrap();
+        let mut len = pipe.client.send(&mut buf,&mut None).unwrap();
 
         // Server sends Retry packet.
         let hdr = Header::from_slice(&mut buf[..len], MAX_CONN_ID_LEN).unwrap();
@@ -5756,7 +5759,7 @@ mod tests {
         // Client receives Retry and sends new Initial.
         assert_eq!(pipe.client.recv(&mut buf[..len]), Err(Error::Done));
 
-        len = pipe.client.send(&mut buf).unwrap();
+        len = pipe.client.send(&mut buf,&mut None).unwrap();
 
         let hdr = Header::from_slice(&mut buf[..len], MAX_CONN_ID_LEN).unwrap();
         assert_eq!(&hdr.token.unwrap(), token);

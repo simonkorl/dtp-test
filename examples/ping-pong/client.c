@@ -62,7 +62,7 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
   static uint8_t out[MAX_DATAGRAM_SIZE];
 
   while (1) {
-    ssize_t written = quiche_conn_send(conn_io->conn, out, sizeof(out));
+    ssize_t written = quiche_conn_send(conn_io->conn, out, sizeof(out), NULL, (size_t *) NULL);
 
     if (written == QUICHE_ERR_DONE) {
       fprintf(stderr, "done writing\n");
