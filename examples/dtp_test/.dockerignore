@@ -1,0 +1,8 @@
+server
+client
+server_err.log
+client_err.log
+capture.log
+client.log
+output.log
+build/

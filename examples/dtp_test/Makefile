@@ -23,7 +23,7 @@ LDFLAGS = -L$(LIBCRYPTO_DIR) -L$(LIBSSL_DIR) -L$(LIB_DIR) -L../src/aitrans/libto
 LIBS = $(LIB_DIR)/libquiche.a -lev -ldl -pthread -lm
 CPPFLAGS =  -lstdc++
 
-PORT = 5556
+PORT = 5557
 
 all: server client
 
@@ -40,12 +40,14 @@ $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
 
 test: server client
-	./server 127.0.0.1 $(PORT) trace/block_trace/aitrans_block.txt &> server_err.log &
-	sleep 0.2
-	./client 127.0.0.1 $(PORT) &> client_err.log &
+	./server 127.0.0.1 $(PORT) trace/block_trace/aitrans_block.txt &> server_err.log & \
+	./client 127.0.0.1 $(PORT) &> client_err.log & wait
 
 kill:
-	kill `lsof -i:5556 | awk '/server/ {print$2}'`
+	@kill `lsof -i:5557 | awk '/server/ {print$$2}'`
+    # @kill `lsof -i:5557 | awk '/client/ {print$$2}'`
 
 clean:
 	@$(RM) -rf server client build/
+
+.PHONY: clean

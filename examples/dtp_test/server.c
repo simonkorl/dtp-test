@@ -92,6 +92,43 @@ static quiche_config *config = NULL;
 
 static struct connections *conns = NULL;
 
+u_char tos(u_int ddl, u_int prio) {
+    u_char d, p;
+
+    // 0x64 100ms
+    // 0xC8 200ms
+    // 0x1F4 500ms
+    // 0x3E8 1m
+    // 0xEA60 1min
+    if (ddl < 0x64) {
+        d = 5;
+    } else if (ddl < 0xC8) {
+        d = 4;
+    } else if (ddl < 0x1F4) {
+        d = 3;
+    } else if (ddl < 0x3E8) {
+        d = 2;
+    } else if (ddl < 0xEA60) {
+        d = 1;
+    } else {
+        d = 0;
+    }
+
+    if (prio < 2) {
+        p = 5 - prio;
+    } else if (prio < 4) {
+        p = 3;
+    } else if (prio < 8) {
+        p = 2;
+    } else if (prio < 16) {
+        p = 1;
+    } else {
+        p = 0;
+    }
+
+    return (d > p) ? d : p;
+}
+
 static void timeout_cb(EV_P_ ev_timer *w, int revents);
 
 // static void debug_log(const char *line, void *argp) {
@@ -141,15 +178,21 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
             return;
         }
 
-        if (stream_blocks_num > 0) {
-          for (int i = 0; i < stream_blocks_num; ++i) {
-            printf("%d: stream_id: %ld, ddl: %ld, priority: %ld\n", i,
-                   stream_blocks[i].block_id, stream_blocks[i].block_deadline,
-                   stream_blocks[i].block_priority);
-          }
-          free(stream_blocks);
-        }
+        // if (stream_blocks_num > 0) {
+        //   for (int i = 0; i < stream_blocks_num; ++i) {
+        //     printf("%d: stream_id: %ld, ddl: %ld, priority: %ld\n", i,
+        //            stream_blocks[i].block_id, stream_blocks[i].block_deadline,
+        //            stream_blocks[i].block_priority);
+        //   }
+        //   free(stream_blocks);
+        // }
 
+        if (stream_blocks_num > 0) {
+            int t = tos(stream_blocks[0].block_deadline, stream_blocks[0].block_priority) << 5;
+            // fprintf(stdout, "try set TOS\n");
+            if (setsockopt(conn_io->sock, IPPROTO_IP, IP_TOS, &t, sizeof(int)) < 0)
+                fprintf(stderr, "Warning: Cannot set TOS!\n");
+        }
         ssize_t sent = sendto(conn_io->sock, out, written, 0,
                               (struct sockaddr *)&conn_io->peer_addr,
                               conn_io->peer_addr_len);
@@ -398,6 +441,10 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                     return;
                 }
 
+                int t = 5 << 5;
+                if (setsockopt(conns->sock, IPPROTO_IP, IP_TOS, &t, sizeof(int)) < 0)
+                    fprintf(stderr, "Warning: Cannot set TOS!\n");
+
                 ssize_t sent =
                     sendto(conns->sock, out, written, 0,
                            (struct sockaddr *)&peer_addr, peer_addr_len);
@@ -425,6 +472,10 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                     //         written);
                     return;
                 }
+
+                int t = 5 << 5;
+                if (setsockopt(conns->sock, IPPROTO_IP, IP_TOS, &t, sizeof(int)) < 0)
+                    fprintf(stderr, "Warning: Cannot set TOS!\n");
 
                 ssize_t sent =
                     sendto(conns->sock, out, written, 0,
@@ -505,7 +556,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
 
             quiche_conn_stats(conn_io->conn, &stats);
             fprintf(stderr,
-                    "connection closed, you can see result in client.log\n");
+                    "[RECVcb] connection closed, you can see result in client.log\n");
             // fprintf(stderr,
             //         "connection closed, recv=%zu sent=%zu lost=%zu rtt=%"
             //         PRIu64 "ns cwnd=%zu\n", stats.recv, stats.sent,
@@ -540,7 +591,7 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
         //         "ns cwnd=%zu\n",
         //         stats.recv, stats.sent, stats.lost, stats.rtt, stats.cwnd);
         fprintf(stderr,
-                "connection closed, you can see result in client.log\n");
+                "[TOcb] connection closed, you can see result in client.log\n");
 
         // fflush(stdout);
 

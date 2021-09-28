@@ -1,0 +1,27 @@
+FROM simonkorl0228/aitrans_build:buster as build
+
+WORKDIR /build
+
+COPY benches ./benches
+COPY deps ./deps
+COPY examples/dtp_test ./examples/dtp_test
+COPY src ./src
+COPY include ./include
+COPY Cargo.toml ./Cargo.toml
+
+WORKDIR /build/examples/dtp_test
+
+RUN echo "[source.crates-io]\n\
+    replace-with = 'tuna'\n\n\
+    [source.tuna]\n\
+    registry = \"https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git\"" > $CARGO_HOME/config && \
+    apt-get update && apt-get install -y uthash-dev && \
+    make all
+
+FROM simonkorl0228/aitrans_image_base:buster
+COPY --from=build \
+    /build/examples/dtp_test/server /home/aitrans-server/bin/server
+COPY --from=build \
+    /build/examples/dtp_test/client /home/aitrans-server/client
+COPY --from=build \
+    /build/examples/dtp_test/trace /home/aitrans-server/trace
