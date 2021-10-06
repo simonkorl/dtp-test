@@ -60,6 +60,7 @@ struct dtp_config *cfgs = NULL;
 
 struct connections {
     int sock;
+    int ai_family;
 
     struct conn_io *h;
 };
@@ -72,6 +73,7 @@ struct conn_io {
     dtp_config *configs;
 
     int sock;
+    int ai_family;
 
     uint64_t t_last;
     ssize_t can_send;
@@ -127,6 +129,24 @@ u_char tos(u_int ddl, u_int prio) {
     }
 
     return (d > p) ? d : p;
+}
+
+void set_tos(int ai_family, int sock, int tos) {
+    switch (ai_family)
+    {
+        case AF_INET:
+            if (setsockopt(sock, IPPROTO_IP, IP_TOS, &tos, sizeof(int)) < 0)
+                fprintf(stderr, "Warning: Cannot set TOS!\n");
+            break;
+
+        case AF_INET6:
+            if (setsockopt(sock, IPPROTO_IPV6, IPV6_TCLASS, &tos, sizeof(int)) < 0)
+                fprintf(stderr, "Warning: Cannot set TOS!\n");
+            break;
+
+        default:
+            break;
+    }
 }
 
 static void timeout_cb(EV_P_ ev_timer *w, int revents);
@@ -189,9 +209,7 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
 
         if (stream_blocks_num > 0) {
             int t = tos(stream_blocks[0].block_deadline, stream_blocks[0].block_priority) << 5;
-            // fprintf(stdout, "try set TOS\n");
-            if (setsockopt(conn_io->sock, IPPROTO_IP, IP_TOS, &t, sizeof(int)) < 0)
-                fprintf(stderr, "Warning: Cannot set TOS!\n");
+            set_tos(conn_io->ai_family, conn_io->sock, t);
         }
         ssize_t sent = sendto(conn_io->sock, out, written, 0,
                               (struct sockaddr *)&conn_io->peer_addr,
@@ -341,6 +359,7 @@ static struct conn_io *create_conn(struct ev_loop *loop, uint8_t *odcid,
     }
 
     conn_io->sock = conns->sock;
+    conn_io->ai_family = conns->ai_family;
     conn_io->conn = conn;
 
     conn_io->send_round = -1;
@@ -442,8 +461,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
 
                 int t = 5 << 5;
-                if (setsockopt(conns->sock, IPPROTO_IP, IP_TOS, &t, sizeof(int)) < 0)
-                    fprintf(stderr, "Warning: Cannot set TOS!\n");
+                set_tos(conns->ai_family, conns->sock, t);
 
                 ssize_t sent =
                     sendto(conns->sock, out, written, 0,
@@ -474,8 +492,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
 
                 int t = 5 << 5;
-                if (setsockopt(conns->sock, IPPROTO_IP, IP_TOS, &t, sizeof(int)) < 0)
-                    fprintf(stderr, "Warning: Cannot set TOS!\n");
+                set_tos(conns->ai_family, conns->sock, t);
 
                 ssize_t sent =
                     sendto(conns->sock, out, written, 0,
@@ -664,6 +681,7 @@ int main(int argc, char *argv[]) {
 
     struct connections c;
     c.sock = sock;
+    c.ai_family = local->ai_family;
     c.h = NULL;
 
     conns = &c;
