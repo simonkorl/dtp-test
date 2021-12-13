@@ -727,7 +727,7 @@ impl Config {
             // let (bct_offset, s) = ntp_offset("0.pool.ntp.org:123");
             // let (bct_offset, s) = ntp_offset("time1.cloud.tencent.com:123");
             // self.bct_offset = bct_offset;
-            self.bct_offset = 0;
+            // self.bct_offset = 0;
             // eprintln!("{}", s);
         }
         // Always call `SolutionInit` to apply default block selection algorithm
@@ -752,6 +752,14 @@ impl Config {
     /// The default value is `0.0`.
     pub fn set_redundancy_rate(&mut self, rate: f32) {
         self.init_redundancy_rate = rate;
+    }
+
+    /// Set the ntp server
+    pub fn set_ntp_server(&mut self, server_ip: &str) {
+        use crate::ntp::ntp_offset;
+        let (bct_offset, s) = ntp_offset(format!("{}:123", server_ip).as_str());
+        self.bct_offset = bct_offset;
+        eprint!("{}", s);
     }
 }
 

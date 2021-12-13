@@ -326,6 +326,7 @@ int main(int argc, char *argv[]) {
     //quiche_config_set_initial_max_streams_uni(config, 10000);
     //quiche_config_set_disable_active_migration(config, true);
     quiche_config_set_cc_algorithm(config, QUICHE_CC_RENO);
+    quiche_config_set_ntp_server(config, "192.168.0.1");
 
     if (getenv("SSLKEYLOGFILE")) {
         quiche_config_log_keys(config);

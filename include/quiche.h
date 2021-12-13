@@ -183,6 +183,9 @@ enum quiche_cc_algorithm {
 // Sets the congestion control algorithm used.
 void quiche_config_set_cc_algorithm(quiche_config *config, enum quiche_cc_algorithm algo);
 
+// set the ntp server
+void quiche_config_set_ntp_server(quiche_config *config, const char* server);
+
 // Sets the data ack ratios
 void quiche_config_set_data_ack_ratio(quiche_config *config, uint64_t ratio);
 

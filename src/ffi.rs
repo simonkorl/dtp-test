@@ -245,6 +245,13 @@ pub extern fn quiche_config_set_redundancy_rate(
 ) {
     config.init_redundancy_rate = rate;
 }
+// update by mc
+#[no_mangle]
+pub extern fn quiche_config_set_ntp_server(config: &mut Config, server_ip: *const c_char) {
+    let server_ip = unsafe { ffi::CStr::from_ptr(server_ip).to_str().unwrap() };
+
+    config.set_ntp_server(server_ip);
+}
 
 #[no_mangle]
 pub extern fn quiche_config_free(config: *mut Config) {
