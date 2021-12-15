@@ -13,7 +13,7 @@ TRACE_FILE_BASENAME=${TRACE_FILE_BASENAME%.*}
 TC_LOG=${TC_LOG:-tc.log}
 SERVER_LOG=${SERVER_LOG:-server.log}
 COUNT=0
-CLIENT_LOG=${CLIENT_LOG:-client}-${TRACE_FILE_BASENAME}-${COUNT}.log
+CLIENT_LOG=${CLIENT_LOG:-client}-${TRACE_FILE_BASENAME}
 
 # sudo python /home/ubuntu1/dtp_test_scripts/traffic_control.py --load /home/ubuntu1/dtp_test_scripts/net_trace/traces_17.txt -nic enp1s0 > tc.log 2>&1 & ./server 192.168.0.2 5555 trace/block_trace/aitrans_block.txt
 
@@ -36,17 +36,17 @@ elif [ "$1" == "client" ]; then
 
     if [ $TRAFFIC_CONTROL == true ]; then
 
-        for ((i = 1; i <= $2; i++)); do
+        for ((COUNT; COUNT < $2; COUNT++)); do
 
-            python ${TRAFFIC_CONTROL_SCRIPT} --load ${NET_TRACE} ${TRAFFIC_CONTROL_ARGS} > ${TC_LOG} 2>&1 & ${CLIENT} ${SERVER_IP} ${SERVER_PORT} && mv client.log ${CLIENT_LOG}
+            python ${TRAFFIC_CONTROL_SCRIPT} --load ${NET_TRACE} ${TRAFFIC_CONTROL_ARGS} > ${TC_LOG} 2>&1 & ${CLIENT} ${SERVER_IP} ${SERVER_PORT} && mv client.log ${CLIENT_LOG}-${COUNT}.log
 
         done
     
     else
 
-        for ((i = 1; i <= $2; i++)); do
+        for ((COUNT; COUNT < $2; COUNT++)); do
 
-            {CLIENT} ${SERVER_IP} ${SERVER_PORT} && mv client.log ${CLIENT_LOG}
+            {CLIENT} ${SERVER_IP} ${SERVER_PORT} && mv client.log ${CLIENT_LOG}-${COUNT}.log
 
         done
     
