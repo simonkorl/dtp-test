@@ -54,6 +54,8 @@ char *dtp_cfg_fname;
 int cfgs_len;
 struct dtp_config *cfgs = NULL;
 
+char REQ[10] = {0};
+
 #define MAX_TOKEN_LEN                                        \
     sizeof("quiche") - 1 + sizeof(struct sockaddr_storage) + \
         QUICHE_MAX_CONN_ID_LEN
@@ -209,6 +211,13 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
 
         if (stream_blocks_num > 0) {
             int t = tos(stream_blocks[0].block_deadline, stream_blocks[0].block_priority) << 5;
+            if (REQ[0] == '0') {
+                t |= (1 << 2);
+            } else if (REQ[0] == '1') {
+                t |= (1 << 3);
+            } else if (REQ[0] == '2') {
+                t |= (1 << 4);
+            }
             set_tos(conn_io->ai_family, conn_io->sock, t);
         }
         ssize_t sent = sendto(conn_io->sock, out, written, 0,
@@ -461,6 +470,13 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
 
                 int t = 5 << 5;
+                if (REQ[0] == '0') {
+                    t |= (1 << 2);
+                } else if (REQ[0] == '1') {
+                    t |= (1 << 3);
+                } else if (REQ[0] == '2') {
+                    t |= (1 << 4);
+                }
                 set_tos(conns->ai_family, conns->sock, t);
 
                 ssize_t sent =
@@ -492,6 +508,13 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
 
                 int t = 5 << 5;
+                if (REQ[0] == '0') {
+                    t |= (1 << 2);
+                } else if (REQ[0] == '1') {
+                    t |= (1 << 3);
+                } else if (REQ[0] == '2') {
+                    t |= (1 << 4);
+                }
                 set_tos(conns->ai_family, conns->sock, t);
 
                 ssize_t sent =
@@ -625,6 +648,11 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
 }
 
 int main(int argc, char *argv[]) {
+    if (getenv("DTP_REQ")) {
+        strcpy(REQ, getenv("DTP_REQ"));
+    }
+    fprintf(stdout, "DTP_REQ: %s\n", REQ);
+
     fprintf(stderr, "server start,  timestamp: %lu\n",
             getCurrentUsec() / 1000 / 1000);
     const char *host = argv[1];

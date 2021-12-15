@@ -45,6 +45,8 @@
 
 #define MAX_BLOCK_SIZE 1000000  // 1Mbytes
 
+char REQ[10] = {0};
+
 uint64_t total_bytes = 0;
 uint64_t good_bytes = 0;
 uint64_t complete_bytes = 0;
@@ -139,6 +141,13 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
         }
 
         int t = 5 << 5;
+        if (REQ[0] == '0') {
+            t |= (1 << 2);
+        } else if (REQ[0] == '1') {
+            t |= (1 << 3);
+        } else if (REQ[0] == '2') {
+            t |= (1 << 4);
+        }
         set_tos(conn_io->ai_family, conn_io->sock, t);
         ssize_t sent = send(conn_io->sock, out, written, 0);
         if (sent != written) {
@@ -293,6 +302,11 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
 }
 
 int main(int argc, char *argv[]) {
+    if (getenv("DTP_REQ")) {
+        strcpy(REQ, getenv("DTP_REQ"));
+    }
+    fprintf(stdout, "DTP_REQ: %s\n", REQ);
+
     const char *host = argv[1];
     const char *port = argv[2];
     // const double priority_weight = atof(argv[4]);
