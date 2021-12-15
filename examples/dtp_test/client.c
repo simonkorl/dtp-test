@@ -69,6 +69,7 @@ struct conn_io {
     ev_timer pace_timer;
 
     int sock;
+    int ai_family;
     quiche_conn *conn;
 
     uint64_t t_last;
@@ -138,7 +139,7 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
         }
 
         int t = 5 << 5;
-        set_tos(conns->ai_family, conns->sock, t);
+        set_tos(conn_io->ai_family, conn_io->sock, t);
         ssize_t sent = send(conn_io->sock, out, written, 0);
         if (sent != written) {
             perror("failed to send");
@@ -390,6 +391,7 @@ int main(int argc, char *argv[]) {
     // fclose(clientlog);
 
     conn_io->sock = sock;
+    conn_io->ai_family = peer->ai_family;
     conn_io->conn = conn;
     conn_io->t_last = getCurrentUsec();
     conn_io->can_send = 1350;
