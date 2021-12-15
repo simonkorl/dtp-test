@@ -759,7 +759,7 @@ impl Config {
         use crate::ntp::ntp_offset;
         let (bct_offset, s) = ntp_offset(format!("{}:123", server_ip).as_str());
         self.bct_offset = bct_offset;
-        eprint!("{}", s);
+        eprintln!("{}", s);
     }
 }
 

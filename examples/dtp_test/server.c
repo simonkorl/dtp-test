@@ -678,6 +678,7 @@ int main(int argc, char *argv[]) {
     quiche_config_set_initial_max_stream_data_bidi_remote(config, 1000000000);
     quiche_config_set_initial_max_streams_bidi(config, 10000);
     quiche_config_set_cc_algorithm(config, QUICHE_CC_RENO);
+    quiche_config_set_ntp_server(config, "192.168.0.1");
 
     struct connections c;
     c.sock = sock;

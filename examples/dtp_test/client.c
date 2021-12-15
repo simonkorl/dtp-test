@@ -76,6 +76,24 @@ struct conn_io {
     bool done_writing;
 };
 
+void set_tos(int ai_family, int sock, int tos) {
+    switch (ai_family)
+    {
+        case AF_INET:
+            if (setsockopt(sock, IPPROTO_IP, IP_TOS, &tos, sizeof(int)) < 0)
+                fprintf(stderr, "Warning: Cannot set TOS!\n");
+            break;
+
+        case AF_INET6:
+            if (setsockopt(sock, IPPROTO_IPV6, IPV6_TCLASS, &tos, sizeof(int)) < 0)
+                fprintf(stderr, "Warning: Cannot set TOS!\n");
+            break;
+
+        default:
+            break;
+    }
+}
+
 // static void debug_log(const char *line, void *argp) {
 //     fprintf(stderr, "%s\n", line);
 // }
@@ -119,6 +137,8 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
             return;
         }
 
+        int t = 5 << 5;
+        set_tos(conns->ai_family, conns->sock, t);
         ssize_t sent = send(conn_io->sock, out, written, 0);
         if (sent != written) {
             perror("failed to send");
@@ -326,7 +346,7 @@ int main(int argc, char *argv[]) {
     //quiche_config_set_initial_max_streams_uni(config, 10000);
     //quiche_config_set_disable_active_migration(config, true);
     quiche_config_set_cc_algorithm(config, QUICHE_CC_RENO);
-    quiche_config_set_ntp_server(config, "192.168.0.1");
+    // quiche_config_set_ntp_server(config, "192.168.0.1");
 
     if (getenv("SSLKEYLOGFILE")) {
         quiche_config_log_keys(config);
