@@ -27,6 +27,14 @@ PORT = 5557
 
 all: server client
 
+all_test: server_test client_test
+
+server_test: server_test.c $(INCLUDE_DIR)/quiche.h $(LIB_DIR)/libquiche.a dtp_config.h
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(INCS) $(LIBS) $(CPPFLAGS)
+
+client_test: client_test.c $(INCLUDE_DIR)/quiche.h $(LIB_DIR)/libquiche.a dtp_config.h
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(INCS) $(LIBS) $(CPPFLAGS)
+
 server: server.c $(INCLUDE_DIR)/quiche.h $(LIB_DIR)/libquiche.a dtp_config.h
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(INCS) $(LIBS) $(CPPFLAGS)
 
