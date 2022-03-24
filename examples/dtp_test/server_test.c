@@ -18,6 +18,8 @@
 #include "helper.h"
 #include "uthash.h"
 
+static bool TOS_ENABLE = false;
+
 /***** Argp configs *****/
 
 const char *argp_program_version = "server-test 0.0.1";
@@ -30,6 +32,7 @@ static struct argp_option options[] = {
     {"out", 'o', "FILE", 0, "output file with received file info"},
     {"log-level", 'v', "LEVEL", 0, "log level ERROR 1 -> TRACE 5"},
     {"color", 'c', 0, 0, "log with color"},
+    {"tos", 't', 0, 0, "set tos"},
     {0}};
 
 struct arguments {
@@ -54,6 +57,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
             break;
         case 'c':
             LOG_COLOR = 1;
+            break;
+        case 't':
+            TOS_ENABLE = true;
             break;
         case ARGP_KEY_ARG:
             if (state->arg_num >= ARGS_NUM) argp_usage(state);
@@ -83,6 +89,8 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 #define MAX_DATAGRAM_SIZE 1350
 
 #define MAX_BLOCK_SIZE 1000000  // 1Mbytes
+
+uint64_t total_udp_bytes = 0;
 
 char *dtp_cfg_fname;
 int cfgs_len;
@@ -166,6 +174,10 @@ uint8_t tos(uint64_t ddl, uint64_t prio) {
 }
 
 void set_tos(int ai_family, int sock, int tos) {
+    if (!TOS_ENABLE) {
+        return;
+    }
+
     switch (ai_family) {
         case AF_INET:
             if (setsockopt(sock, IPPROTO_IP, IP_TOS, &tos, sizeof(int)) < 0) {
@@ -456,6 +468,8 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
             log_error("failed to read");
             return;
         }
+
+        total_udp_bytes += read;
 
         uint8_t type;
         uint32_t version;

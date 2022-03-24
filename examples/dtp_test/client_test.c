@@ -18,6 +18,8 @@
 #include "helper.h"
 #include "uthash.h"
 
+static bool TOS_ENABLE = false;
+
 /***** Argp configs *****/
 
 const char *argp_program_version = "client-test 0.0.1";
@@ -30,6 +32,7 @@ static struct argp_option options[] = {
     {"out", 'o', "FILE", 0, "output file with received file info"},
     {"log-level", 'v', "LEVEL", 0, "log level ERROR 1 -> TRACE 5"},
     {"color", 'c', 0, 0, "log with color"},
+    {"tos", 't', 0, 0, "set tos"},
     {0}};
 
 struct arguments {
@@ -54,6 +57,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
             break;
         case 'c':
             LOG_COLOR = 1;
+            break;
+        case 't':
+            TOS_ENABLE = true;
             break;
         case ARGP_KEY_ARG:
             if (state->arg_num >= ARGS_NUM) argp_usage(state);
@@ -83,6 +89,7 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 #define MAX_BLOCK_SIZE 10000000  // QUIC
 
 uint64_t total_bytes = 0;
+uint64_t total_udp_bytes = 0;
 uint64_t good_bytes = 0;
 uint64_t complete_bytes = 0;
 uint64_t start_timestamp = 0;
@@ -102,6 +109,10 @@ struct conn_io {
 };
 
 void set_tos(int ai_family, int sock, int tos) {
+    if (!TOS_ENABLE) {
+        return;
+    }
+
     switch (ai_family) {
         case AF_INET:
             if (setsockopt(sock, IPPROTO_IP, IP_TOS, &tos, sizeof(int)) < 0) {
@@ -202,6 +213,8 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
             return;
         }
 
+        total_udp_bytes += read;
+
         ssize_t done = quiche_conn_recv(conn_io->conn, buf, read);
 
         if (done == QUICHE_ERR_DONE) {
@@ -224,10 +237,10 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
         quiche_conn_stats(conn_io->conn, &stats);
         log_info(
             "connection closed, recv=%zu sent=%zu lost=%zu rtt=%fms cwnd=%zu, "
-            "total_bytes=%zu, complete_bytes=%zu, good_bytes=%zu, "
+            "total_bytes=%zu, total_udp_bytes=%zu, complete_bytes=%zu, good_bytes=%zu, "
             "total_time=%zu\n",
             stats.recv, stats.sent, stats.lost, stats.rtt / 1000.0 / 1000.0,
-            stats.cwnd, total_bytes, complete_bytes, good_bytes,
+            stats.cwnd, total_bytes, total_udp_bytes, complete_bytes, good_bytes,
             end_timestamp - start_timestamp
 
         );
@@ -307,10 +320,10 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
         // fclose(clientlog);
         log_info(
             "connection closed, recv=%zu sent=%zu lost=%zu rtt=%fms cwnd=%zu, "
-            "total_bytes=%zu, complete_bytes=%zu, good_bytes=%zu, "
+            "total_bytes=%zu, total_udp_bytes=%zu, complete_bytes=%zu, good_bytes=%zu, "
             "total_time=%zu\n",
             stats.recv, stats.sent, stats.lost, stats.rtt / 1000.0 / 1000.0,
-            stats.cwnd, total_bytes, complete_bytes, good_bytes,
+            stats.cwnd, total_bytes, total_udp_bytes, complete_bytes, good_bytes,
             end_timestamp - start_timestamp);
         // fprintf(stderr,
         //         "connection closed, recv=%zu sent=%zu lost=%zu rtt=%" PRIu64
@@ -328,8 +341,7 @@ int main(int argc, char *argv[]) {
     args.out = stdout;
     args.log = stderr;
     argp_parse(&argp, argc, argv, 0, 0, &args);
-    log_info("SERVER_IP %s SERVER_PORT %s",
-             args.args[0], args.args[1]);
+    log_info("SERVER_IP %s SERVER_PORT %s", args.args[0], args.args[1]);
 
     const struct addrinfo hints = {.ai_family = PF_UNSPEC,
                                    .ai_socktype = SOCK_DGRAM,
