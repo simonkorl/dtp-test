@@ -83,6 +83,10 @@ impl Default for DynScheduler {
             DynScheduler { 
                 scheduler: Box::new(c_scheduler::CScheduler::new())
             }
+        } else if cfg!(feature = "scheduler-off") {
+            DynScheduler { 
+                scheduler: Box::new(BasicScheduler::new())
+            }
         } else {
             DynScheduler {
                 scheduler: Box::new(dtp_scheduler::DtpScheduler::new())

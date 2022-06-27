@@ -57,6 +57,9 @@ bench = ["criterion"]
 # For building with exposing interfaces without default implementation
 interface = []
 
+# Disable scheduler and use FIFO
+scheduler-off = []
+
 [package.metadata.docs.rs]
 default-features = false
 
