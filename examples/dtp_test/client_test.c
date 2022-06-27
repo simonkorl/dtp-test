@@ -264,6 +264,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 break;
             }
             if (fin) {
+                end_timestamp = getCurrentUsec();
                 // output block_size,block_priority,block_deadline
                 uint64_t block_size, block_priority, block_deadline;
                 int64_t bct = quiche_conn_get_bct(conn_io->conn, s);
@@ -278,8 +279,8 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 //         goodbytes, bct, block_size, block_priority,
                 //         block_deadline);
                 // fclose(clientlog);
-                dump_file("%ld,%ld,%ld,%ld,%ld\n", s, bct, block_size,
-                          block_priority, block_deadline);
+                dump_file("%ld,%ld,%ld,%ld,%ld,%ld\n", s, bct, block_size,
+                          block_priority, block_deadline, end_timestamp - start_timestamp);
             }
 
             // if (fin) {
@@ -386,7 +387,7 @@ int main(int argc, char *argv[]) {
     quiche_config_set_initial_max_stream_data_bidi_local(config, 1000000000);
     quiche_config_set_initial_max_stream_data_bidi_remote(config, 1000000000);
     // quiche_config_set_initial_max_stream_data_uni(config, 1000000000);
-    quiche_config_set_initial_max_streams_bidi(config, 10000);
+    quiche_config_set_initial_max_streams_bidi(config, 40000);
     // quiche_config_set_initial_max_streams_uni(config, 10000);
     // quiche_config_set_disable_active_migration(config, true);
     quiche_config_set_cc_algorithm(config, QUICHE_CC_RENO);
@@ -427,7 +428,7 @@ int main(int argc, char *argv[]) {
 
     // fprintf(stdout, "StreamID goodbytes bct BlockSize Priority Deadline\n");
 
-    dump_file("BlockID,bct,BlockSize,Priority,Deadline\n");
+    dump_file("block_id,bct,size,priority,deadline,duration\n");
     // FILE* clientlog = fopen("client.log", "w");
     // fprintf(clientlog, "StreamID  bct  BlockSize  Priority  Deadline\n");
     // fclose(clientlog);

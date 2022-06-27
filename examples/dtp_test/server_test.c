@@ -364,14 +364,14 @@ static void sender_cb(EV_P_ ev_timer *w, int revents) {
                 break;
             }
 
-            if (send_time_gap > 0.005) {
+            // if (send_time_gap > 0.005) {
                 conn_io->sender.repeat = send_time_gap;
                 ev_timer_again(loop, &conn_io->sender);
                 // log_debug("time gap: %f", send_time_gap);
                 break;  //每次只发一个block
-            } else {
-                continue;  //如果间隔太小，则接着发
-            }
+            // } else {
+            //     continue;  //如果间隔太小，则接着发
+            // }
         }
     }
     flush_egress(loop, conn_io);
@@ -725,7 +725,7 @@ int main(int argc, char *argv[]) {
     quiche_config_set_initial_max_data(config, 10000000000);
     quiche_config_set_initial_max_stream_data_bidi_local(config, 1000000000);
     quiche_config_set_initial_max_stream_data_bidi_remote(config, 1000000000);
-    quiche_config_set_initial_max_streams_bidi(config, 10000);
+    quiche_config_set_initial_max_streams_bidi(config, 40000);
     quiche_config_set_cc_algorithm(config, QUICHE_CC_RENO);
     // quiche_config_set_ntp_server(config, "192.168.0.1");
 
