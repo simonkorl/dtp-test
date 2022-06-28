@@ -14,7 +14,7 @@ QUIC_SERVER=${QUIC_SERVER:-./server_test_fifo}
 QUIC_CLIENT=${QUIC_CLIENT:-./client_test_fifo}
 
 PY=${PY:-python}
-DRAW_PY_SCRIPT=${DRAW_PY_SCRIPT:-./liveshow.py}
+DRAW_PY_SCRIPT=${DRAW_PY_SCRIPT:-~/dtp-test-script/liveshow.py}
 
 SERVER_IP=${SERVER_IP:-127.0.0.1}
 DTP_PORT=${DTP_PORT:-5555}
