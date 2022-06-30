@@ -216,7 +216,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
                 break;
             }
 
-            log_error("client failed to read");
+            log_error("client failed to read %s", strerror(errno));
             return;
         }
 
