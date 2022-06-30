@@ -19,6 +19,8 @@
 #include "uthash.h"
 
 static bool TOS_ENABLE = false;
+static bool MULIP_ENABLE = false;
+static int ip_cfg[8] = {0, 0x20, 0x40, 0x60, 0x80, 0xa0, 0xc0, 0xe0};
 
 /***** Argp configs *****/
 
@@ -33,6 +35,7 @@ static struct argp_option options[] = {
     {"log-level", 'v', "LEVEL", 0, "log level ERROR 1 -> TRACE 5"},
     {"color", 'c', 0, 0, "log with color"},
     {"tos", 't', 0, 0, "set tos"},
+    {"mulip", 'm', 0, 0, "set multi ip"},
     {0}};
 
 struct arguments {
@@ -60,6 +63,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
             break;
         case 't':
             TOS_ENABLE = true;
+            break;
+        case 'm':
+            MULIP_ENABLE = true;
             break;
         case ARGP_KEY_ARG:
             if (state->arg_num >= ARGS_NUM) argp_usage(state);
@@ -101,7 +107,7 @@ struct dtp_config *cfgs = NULL;
         QUICHE_MAX_CONN_ID_LEN
 
 struct connections {
-    int sock;
+    int *socks;
     int ai_family;
 
     struct conn_io *h;
@@ -114,7 +120,7 @@ struct conn_io {
     int configs_len;
     dtp_config *configs;
 
-    int sock;
+    int *socks;
     int ai_family;
 
     uint64_t t_last;
@@ -252,13 +258,19 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
         //   free(stream_blocks);
         // }
 
+        int t = 0;
+        int sid = 0;
         if (stream_blocks_num > 0) {
-            int t = tos(stream_blocks[0].block_deadline,
-                        stream_blocks[0].block_priority)
-                    << 5;
-            set_tos(conn_io->ai_family, conn_io->sock, t);
+            sid = tos(stream_blocks[0].block_deadline,
+                      stream_blocks[0].block_priority);
+            t = sid << 5;
+            sid = MULIP_ENABLE ? sid : 0;
+            set_tos(conn_io->ai_family, conn_io->socks[sid], t);
+            in6_addr_set_byte(
+                &((struct sockaddr_in6 *)&conn_io->peer_addr)->sin6_addr, 8,
+                ip_cfg[sid]);
         }
-        ssize_t sent = sendto(conn_io->sock, out, written, 0,
+        ssize_t sent = sendto(conn_io->socks[sid], out, written, 0,
                               (struct sockaddr *)&conn_io->peer_addr,
                               conn_io->peer_addr_len);
         if (sent != written) {
@@ -365,10 +377,10 @@ static void sender_cb(EV_P_ ev_timer *w, int revents) {
             }
 
             // if (send_time_gap > 0.005) {
-                conn_io->sender.repeat = send_time_gap;
-                ev_timer_again(loop, &conn_io->sender);
-                // log_debug("time gap: %f", send_time_gap);
-                break;  //每次只发一个block
+            conn_io->sender.repeat = send_time_gap;
+            ev_timer_again(loop, &conn_io->sender);
+            // log_debug("time gap: %f", send_time_gap);
+            break;  //每次只发一个block
             // } else {
             //     continue;  //如果间隔太小，则接着发
             // }
@@ -405,7 +417,7 @@ static struct conn_io *create_conn(struct ev_loop *loop, uint8_t *odcid,
         return NULL;
     }
 
-    conn_io->sock = conns->sock;
+    conn_io->socks = conns->socks;
     conn_io->ai_family = conns->ai_family;
     conn_io->conn = conn;
 
@@ -442,7 +454,7 @@ static struct conn_io *create_conn(struct ev_loop *loop, uint8_t *odcid,
     return conn_io;
 }
 
-static void recv_cb(EV_P_ ev_io *w, int revents) {
+static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
     // log_debug("enter recv");
     struct conn_io *tmp, *conn_io = NULL;
 
@@ -456,8 +468,10 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
         socklen_t peer_addr_len = sizeof(peer_addr);
         memset(&peer_addr, 0, peer_addr_len);
 
-        ssize_t read = recvfrom(conns->sock, buf, sizeof(buf), 0,
+        ssize_t read = recvfrom(conns->socks[path], buf, sizeof(buf), 0,
                                 (struct sockaddr *)&peer_addr, &peer_addr_len);
+        in6_addr_set_byte(&((struct sockaddr_in6 *)&peer_addr)->sin6_addr, 8,
+                          0);
 
         if (read < 0) {
             if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
@@ -510,10 +524,14 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
 
                 int t = 5 << 5;
-                set_tos(conns->ai_family, conns->sock, t);
+                int sid = MULIP_ENABLE ? 5 : 0;
+                set_tos(conns->ai_family, conns->socks[sid], t);
+                in6_addr_set_byte(
+                    &((struct sockaddr_in6 *)&peer_addr)->sin6_addr, 8,
+                    ip_cfg[sid]);
 
                 ssize_t sent =
-                    sendto(conns->sock, out, written, 0,
+                    sendto(conns->socks[sid], out, written, 0,
                            (struct sockaddr *)&peer_addr, peer_addr_len);
                 if (sent != written) {
                     // log_error("failed to send");
@@ -541,10 +559,14 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
 
                 int t = 5 << 5;
-                set_tos(conns->ai_family, conns->sock, t);
+                int sid = MULIP_ENABLE ? 5 : 0;
+                set_tos(conns->ai_family, conns->socks[sid], t);
+                in6_addr_set_byte(
+                    &((struct sockaddr_in6 *)&peer_addr)->sin6_addr, 8,
+                    ip_cfg[sid]);
 
                 ssize_t sent =
-                    sendto(conns->sock, out, written, 0,
+                    sendto(conns->socks[sid], out, written, 0,
                            (struct sockaddr *)&peer_addr, peer_addr_len);
                 if (sent != written) {
                     // log_error("failed to send");
@@ -639,6 +661,38 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
     }
 }
 
+static void on_recv_0(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 0);
+}
+
+static void on_recv_1(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 1);
+}
+
+static void on_recv_2(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 2);
+}
+
+static void on_recv_3(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 3);
+}
+
+static void on_recv_4(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 4);
+}
+
+static void on_recv_5(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 5);
+}
+
+static void on_recv_6(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 6);
+}
+
+static void on_recv_7(EV_P_ ev_io *w, int revents) {
+    recv_cb(loop, w, revents, 7);
+}
+
 static void timeout_cb(EV_P_ ev_timer *w, int revents) {
     // log_debug("enter timeout");
     struct conn_io *conn_io = w->data;
@@ -692,20 +746,34 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    int sock = socket(local->ai_family, SOCK_DGRAM, 0);
-    if (sock < 0) {
-        log_error("failed to create socket");
-        return -1;
-    }
+    int socks[8];
 
-    if (fcntl(sock, F_SETFL, O_NONBLOCK) != 0) {
-        log_error("failed to make socket non-blocking");
-        return -1;
-    }
-
-    if (bind(sock, local->ai_addr, local->ai_addrlen) < 0) {
-        log_error("failed to connect socket");
-        return -1;
+    if (MULIP_ENABLE) {
+        for (int i = 0; i < 8; i++) {
+            socks[i] = socket(local->ai_family, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+            if (socks[i] < 0) {
+                log_error("failed to create socket");
+                return -1;
+            }
+            struct sockaddr_in6 *local_addr =
+                (struct sockaddr_in6 *)local->ai_addr;
+            in6_addr_set_byte(&local_addr->sin6_addr, 8, ip_cfg[i]);
+            if (bind(socks[i], (struct sockaddr *)local_addr,
+                     local->ai_addrlen) != 0) {
+                log_error("failed to bind socket");
+                return -1;
+            }
+        }
+    } else {
+        socks[0] = socket(local->ai_family, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+        if (socks[0] < 0) {
+            log_error("failed to create socket");
+            return -1;
+        }
+        if (bind(socks[0], local->ai_addr, local->ai_addrlen) != 0) {
+            log_error("failed to bind socket");
+            return -1;
+        }
     }
 
     config = quiche_config_new(QUICHE_PROTOCOL_VERSION);
@@ -730,19 +798,53 @@ int main(int argc, char *argv[]) {
     // quiche_config_set_ntp_server(config, "192.168.0.1");
 
     struct connections c;
-    c.sock = sock;
+    c.socks = socks;
     c.ai_family = local->ai_family;
     c.h = NULL;
 
     conns = &c;
 
-    ev_io watcher;
-
     struct ev_loop *loop = ev_default_loop(0);
 
-    ev_io_init(&watcher, recv_cb, sock, EV_READ);
-    ev_io_start(loop, &watcher);
-    watcher.data = &c;
+    if (MULIP_ENABLE) {
+        ev_io watcher[8];
+        ev_io_init(&watcher[0], on_recv_0, c.socks[0], EV_READ);
+        ev_io_start(loop, &watcher[0]);
+        watcher[0].data = &c;
+
+        ev_io_init(&watcher[1], on_recv_1, c.socks[1], EV_READ);
+        ev_io_start(loop, &watcher[1]);
+        watcher[1].data = &c;
+
+        ev_io_init(&watcher[2], on_recv_2, c.socks[2], EV_READ);
+        ev_io_start(loop, &watcher[2]);
+        watcher[2].data = &c;
+
+        ev_io_init(&watcher[3], on_recv_3, c.socks[3], EV_READ);
+        ev_io_start(loop, &watcher[3]);
+        watcher[3].data = &c;
+
+        ev_io_init(&watcher[4], on_recv_4, c.socks[4], EV_READ);
+        ev_io_start(loop, &watcher[4]);
+        watcher[4].data = &c;
+
+        ev_io_init(&watcher[5], on_recv_5, c.socks[5], EV_READ);
+        ev_io_start(loop, &watcher[5]);
+        watcher[5].data = &c;
+
+        ev_io_init(&watcher[6], on_recv_6, c.socks[6], EV_READ);
+        ev_io_start(loop, &watcher[6]);
+        watcher[6].data = &c;
+
+        ev_io_init(&watcher[7], on_recv_7, c.socks[7], EV_READ);
+        ev_io_start(loop, &watcher[7]);
+        watcher[7].data = &c;
+    } else {
+        ev_io watcher;
+        ev_io_init(&watcher, on_recv_0, socks[0], EV_READ);
+        ev_io_start(loop, &watcher);
+        watcher.data = &c;
+    }
 
     ev_loop(loop, 0);
 

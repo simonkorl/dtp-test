@@ -22,6 +22,11 @@ __uint64_t getCurrentUsec()  //usec
     return tv.tv_sec * 1000*1000 + tv.tv_usec;
 }
 
+void in6_addr_set_byte(struct in6_addr *a, uint8_t i, uint8_t d)
+{
+    a->s6_addr[i] = d;
+}
+
 struct dtp_config {
     int deadline;   // ms
     int priority;   //
@@ -45,7 +50,7 @@ struct dtp_config* parse_dtp_config(const char *filename, int *number)
     int block_size;
 
     int cfgs_len = 0;
-    static int max_cfgs_len = 10000;
+    static int max_cfgs_len = 40000;
     dtp_config *cfgs = malloc(sizeof(*cfgs) * max_cfgs_len);
 
 
