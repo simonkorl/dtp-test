@@ -423,6 +423,9 @@ int main(int argc, char *argv[]) {
                 log_error("failed to bind socket");
                 return -1;
             }
+            struct sockaddr_in6 *peer_addr =
+                (struct sockaddr_in6 *)peer->ai_addr;
+            in6_addr_set_byte(&peer_addr->sin6_addr, 8, ip_cfg[i]);
             if (connect(socks[i], peer->ai_addr, peer->ai_addrlen) != 0) {
                 log_error("failed to connect socket");
                 return -1;
