@@ -1643,6 +1643,10 @@ impl Connection {
 
                     stream.send.ack(data.off(), data.len());
 
+                    if stream.send.is_complete() {
+                        info!("stream {} send complete", stream_id);
+                    }
+
                     if stream.is_complete() {
                         let local = stream.local;
                         self.streams.collect(stream_id, local);

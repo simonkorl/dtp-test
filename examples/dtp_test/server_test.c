@@ -726,6 +726,11 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
     }
 }
 
+static void dump_quiche_log(const char *line, void *argp)
+{
+    dump_file("%s\n", line);
+}
+
 int main(int argc, char *argv[]) {
     args.out = stdout;
     args.log = stderr;
@@ -738,7 +743,7 @@ int main(int argc, char *argv[]) {
                                    .ai_socktype = SOCK_DGRAM,
                                    .ai_protocol = IPPROTO_UDP};
 
-    quiche_enable_debug_logging(debug_log, NULL);
+    quiche_enable_debug_logging(dump_quiche_log, NULL);
 
     struct addrinfo *local;
     if (getaddrinfo(args.args[0], args.args[1], &hints, &local) != 0) {

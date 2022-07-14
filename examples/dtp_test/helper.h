@@ -102,7 +102,7 @@ static int LOG_COLOR = 0;
   do                                  \
   {                                   \
     fprintf(HELPER_OUT, __VA_ARGS__); \
-    fflush(NULL); \
+    fflush(NULL);                     \
   } while (0)
 
 static void debug_log(const char *line, void *argp)
