@@ -109,6 +109,17 @@ const char *quiche_version(void);
 int quiche_enable_debug_logging(void (*cb)(const char *line, void *argp),
                                 void *argp);
 
+enum log_level {
+    Trace = 0,
+    Debug = 1,
+    Info = 2,
+    Warn = 3,
+    Error = 4,
+    Off = 5,
+};
+
+int quiche_set_debug_logging_level(enum log_level level);
+
 // Stores configuration shared between multiple connections.
 typedef struct Config quiche_config;
 
@@ -182,6 +193,27 @@ enum quiche_cc_algorithm {
 
 // Sets the congestion control algorithm used.
 void quiche_config_set_cc_algorithm(quiche_config *config, enum quiche_cc_algorithm algo);
+// TODO: void quiche_config_set_cc_algorithm_name(quiche_config *config, const char* name);
+
+void quiche_config_set_redundancy_rate(quiche_config *config, float rate);
+
+enum quiche_scheduler_type {
+    SCHE_BASIC = 0,
+    SCHE_DTP   = 1,
+    SCHE_C     = 2,
+    SCHE_DYN   = 3
+};
+// Set the scheduler type
+void quiche_config_set_scheduler_type(quiche_config *config);
+
+// Set the scheduler type by its name
+// 
+// Current Available: 
+// "Basic", "basic" for basic FIFO scheduler
+// "DTP", "Dtp", "dtp" for DTP scheduler
+// "C", "c" for C scheduler
+// "Dynamic", "dynamic", "dyn", "Dyn" for Dynamic scheduler
+void quiche_config_set_scheduler_name(quiche_config *config, const char* name);
 
 // set the ntp server
 void quiche_config_set_ntp_server(quiche_config *config, const char* server);
@@ -451,15 +483,30 @@ int64_t quiche_h3_send_request(quiche_h3_conn *conn, quiche_conn *quic_conn,
                                quiche_h3_header *headers, size_t headers_len,
                                bool fin);
 
+//Increase deadline in sends_request .
+int64_t quiche_h3_send_request_full(quiche_h3_conn *conn, quiche_conn *quic_conn,
+                               quiche_h3_header *headers, size_t headers_len,
+                               bool fin, int deadline);
+
 // Sends an HTTP/3 response on the specified stream.
 int quiche_h3_send_response(quiche_h3_conn *conn, quiche_conn *quic_conn,
                             uint64_t stream_id, quiche_h3_header *headers,
                             size_t headers_len, bool fin);
 
+//Increase deadline in send_response .
+int quiche_h3_send_response_full(quiche_h3_conn *conn, quiche_conn *quic_conn,
+                            uint64_t stream_id, quiche_h3_header *headers,
+                            size_t headers_len, bool fin, int deadline);
+
 // Sends an HTTP/3 body chunk on the given stream.
 ssize_t quiche_h3_send_body(quiche_h3_conn *conn, quiche_conn *quic_conn,
                             uint64_t stream_id, uint8_t *body, size_t body_len,
                             bool fin);
+
+//Increase deadline in send_body
+ssize_t quiche_h3_send_body_full(quiche_h3_conn *conn, quiche_conn *quic_conn,
+                            uint64_t stream_id, uint8_t *body, size_t body_len,
+                            bool fin, int deadline);
 
 // Reads request or response body data into the provided buffer.
 ssize_t quiche_h3_recv_body(quiche_h3_conn *conn, quiche_conn *quic_conn,

@@ -54,7 +54,12 @@ impl log::Log for Logger {
     }
 
     fn log(&self, record: &log::Record) {
-        let line = format!("[{}] {}: {}\0",record.level(), record.target(), record.args());
+        let line = format!(
+            "[{}] {}: {}\0",
+            record.level(),
+            record.target(),
+            record.args()
+        );
         (self.cb)(line.as_ptr(), self.argp.load(atomic::Ordering::Relaxed));
     }
 
@@ -72,7 +77,32 @@ pub extern fn quiche_enable_debug_logging(
         return -1;
     }
 
-    log::set_max_level(log::LevelFilter::Info);
+    log::set_max_level(log::LevelFilter::Trace);
+
+    0
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum LogLevel {
+    Trace = 0,
+    Debug = 1,
+    Info = 2,
+    Warn = 3,
+    Error = 4,
+    Off = 5,
+}
+
+#[no_mangle]
+pub extern fn quiche_set_debug_logging_level(level: LogLevel) -> c_int {
+    match level {
+        LogLevel::Off => log::set_max_level(log::LevelFilter::Off),
+        LogLevel::Error => log::set_max_level(log::LevelFilter::Error),
+        LogLevel::Warn => log::set_max_level(log::LevelFilter::Warn),
+        LogLevel::Info => log::set_max_level(log::LevelFilter::Info),
+        LogLevel::Debug => log::set_max_level(log::LevelFilter::Debug),
+        LogLevel::Trace => log::set_max_level(log::LevelFilter::Trace),
+    }
 
     0
 }
@@ -231,18 +261,33 @@ pub extern fn quiche_config_set_cc_algorithm(
     config.set_cc_algorithm(algo);
 }
 
+#[no_mangle]
+pub extern fn quiche_config_set_scheduler_name(
+    config: &mut Config, name: *const c_char,
+) -> c_int {
+    let name = unsafe { ffi::CStr::from_ptr(name).to_str().unwrap() };
+    match config.set_scheduler_by_name(name) {
+        Ok(_) => 0,
+
+        Err(e) => e.to_c() as c_int,
+    }
+}
+
+#[no_mangle]
+pub extern fn quiche_config_set_scheduler_type(
+    config: &mut Config, sche: scheduler::SchedulerType,
+) {
+    config.set_scheduler_type(sche);
+}
+
 // update by mc
 #[no_mangle]
-pub extern fn quiche_config_set_data_ack_ratio(
-    config: &mut Config, ratio: u64
-) {
+pub extern fn quiche_config_set_data_ack_ratio(config: &mut Config, ratio: u64) {
     config.init_data_ack_ratio = ratio;
 }
 // update by mc
 #[no_mangle]
-pub extern fn quiche_config_set_redundancy_rate(
-    config: &mut Config, rate: f32
-) {
+pub extern fn quiche_config_set_redundancy_rate(config: &mut Config, rate: f32) {
     config.init_redundancy_rate = rate;
 }
 // update by mc
@@ -708,7 +753,7 @@ pub struct Stats {
     pub rtt: u64,
     pub cwnd: usize,
     pub recv_bytes: u64,
-    pub sent_bytes: u64 
+    pub sent_bytes: u64,
 }
 
 #[no_mangle]

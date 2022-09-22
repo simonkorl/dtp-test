@@ -60,23 +60,22 @@ impl Scheduler for DtpScheduler {
                     let one_way_delay = rtt / 2.0;
                     let tempsize = block.remaining_size;
 
-                    let remaining_time: f64 = tempddl as f64 -
-                        passed_time as f64 -
-                        one_way_delay -
-                        (tempsize as f64 / (pacing_rate * 1024.0)) * 1000.0; // Bytes / (KB/s) * 1000. (ms)
+                    let remaining_time: f64 = tempddl as f64
+                        - passed_time as f64
+                        - one_way_delay
+                        - (tempsize as f64 / (pacing_rate * 1024.0)) * 1000.0; // Bytes / (KB/s) * 1000. (ms)
                     debug!("dtp scheduler: {{tempddl: {}, passed_time: {}, one_way_delay: {}, tempsize: {}, pacing_rate: {}, remaining_time: {}",
                             tempddl, passed_time, one_way_delay, tempsize, pacing_rate, remaining_time);
 
                     if remaining_time >= 0.0 {
                         let tempprio = block.block_priority;
-                        let weight: f64 = (1.0 * remaining_time / ddl as f64) /
-                            (1.0 - tempprio as f64 / self.max_prio as f64);
-                        if min_weight_block_id == -1 ||
-                            min_weight > weight ||
-                            (min_weight == weight &&
-                                block.remaining_size <
-                                    blocks_vec
-                                        [min_weight_block_id as usize]
+                        let weight: f64 = (1.0 * remaining_time / ddl as f64)
+                            / (1.0 - tempprio as f64 / self.max_prio as f64);
+                        if min_weight_block_id == -1
+                            || min_weight > weight
+                            || (min_weight == weight
+                                && block.remaining_size
+                                    < blocks_vec[min_weight_block_id as usize]
                                         .remaining_size)
                         {
                             min_weight_block_id = i as i32;
@@ -109,17 +108,10 @@ impl Scheduler for DtpScheduler {
         _next_packet_id: u64, current_time: u64,
     ) -> bool {
         let passed_time = current_time - block.block_create_time;
-        // debug!("dtp should_drop_block: passed time: {}, block dll: {}",
-        // passed_time, block.block_deadline);
-        if passed_time > block.block_deadline {
-            info!(
-                "block {} is canceled, passed {}",
-                block.block_id, passed_time
-            );
-            return true;
-        } else {
-            return false;
-        }
-        // return passed_time > block.block_deadline;
+        debug!(
+            "dtp should_drop_block: passed time: {}, block dll: {}",
+            passed_time, block.block_deadline
+        );
+        return passed_time > block.block_deadline;
     }
 }
