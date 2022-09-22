@@ -23,7 +23,7 @@ impl Default for DtpScheduler {
 
 impl Scheduler for DtpScheduler {
     fn new() -> Self {
-        info!("Create DTP Scheduler");
+        // info!("Create DTP Scheduler");
         Default::default()
     }
 

@@ -2330,7 +2330,7 @@ impl Connection {
                     let mut temp_m = 0;
                     let mut temp_n = 0;
 
-                    if self.fec.is_empty() {
+                    if cfg!(feature="fec") && self.fec.is_empty() {
                         let solution_redundancy = Connection::get_redundancy_rate(
                             &block,
                             self.init_redundancy_rate,
