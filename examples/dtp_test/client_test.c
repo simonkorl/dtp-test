@@ -20,7 +20,7 @@
 
 static bool TOS_ENABLE = false;
 static bool MULIP_ENABLE = false;
-static int ip_cfg[8] = {0};
+static int ip_cfg[8] = {0, 0x20, 0x40, 0x60, 0x80, 0xa0, 0xc0, 0xe0};
 
 /***** Argp configs *****/
 
@@ -278,6 +278,7 @@ static void flush_egress_pace(EV_P_ ev_timer *pace_timer, int revents) {
 }
 
 static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
+    log_debug("recv_cb path %d", path);
     struct conn_io *conn_io = w->data;
     static uint8_t buf[MAX_BLOCK_SIZE];
     uint8_t i = 3;
@@ -305,7 +306,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
         }
 
         if (done < 0) {
-            // log_debug("failed to process packet");
+            log_debug("failed to process packet");
             return;
         }
 
@@ -313,7 +314,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
     }
 
     if (quiche_conn_is_closed(conn_io->conn)) {
-        // log_debug("connection closed");
+        log_debug("connection closed");
         quiche_stats stats;
 
         quiche_conn_stats(conn_io->conn, &stats);
@@ -459,7 +460,7 @@ int main(int argc, char *argv[]) {
     args.out = stdout;
     args.log = stderr;
     argp_parse(&argp, argc, argv, 0, 0, &args);
-    log_info("SERVER_IP %s SERVER_PORT %s", args.args[0], args.args[1]);
+    log_info("SERVER_IP %s SERVER_PORT %s CLIENT_IP %s CLIENT_PORT %s", args.args[0], args.args[1], args.args[2], args.args[3]);
 
     const struct addrinfo hints = {.ai_family = PF_UNSPEC,
                                    .ai_socktype = SOCK_DGRAM,
@@ -495,7 +496,7 @@ int main(int argc, char *argv[]) {
             in6_addr_set_byte(&local_addr->sin6_addr, 8, ip_cfg[i]);
             if (bind(socks[i], (struct sockaddr *)local_addr,
                      local->ai_addrlen) != 0) {
-                log_error("failed to bind socket");
+                log_error("failed to bind socket %s", strerror(errno));
                 return -1;
             }
             struct sockaddr_in6 *peer_addr =
