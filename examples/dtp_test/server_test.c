@@ -97,6 +97,7 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 #define MAX_BLOCK_SIZE 1000000  // 1Mbytes
 
 uint64_t total_udp_bytes = 0;
+uint64_t started_at = 0;
 
 char *dtp_cfg_fname;
 int cfgs_len;
@@ -369,6 +370,7 @@ static void sender_cb(EV_P_ ev_timer *w, int revents) {
             } else {
                 // log_debug("send round %d", conn_io->send_round);
             }
+            dump_file("%d,start,%ld\n", stream_id, getCurrentUsec() - started_at);
 
             conn_io->send_round++;
             if (conn_io->send_round >= conn_io->configs_len) {
@@ -512,7 +514,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
 
         if (conn_io == NULL) {
             if (!quiche_version_is_supported(version)) {
-                // log_debug("version negotiation");
+                log_debug("version negotiation");
 
                 ssize_t written = quiche_negotiate_version(
                     scid, scid_len, dcid, dcid_len, out, sizeof(out));
@@ -543,7 +545,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
             }
 
             if (token_len == 0) {
-                // log_debug("stateless retry");
+                log_debug("stateless retry");
 
                 mint_token(dcid, dcid_len, &peer_addr, peer_addr_len, token,
                            &token_len);
@@ -579,7 +581,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
 
             if (!validate_token(token, token_len, &peer_addr, peer_addr_len,
                                 odcid, &odcid_len)) {
-                // log_debug("invalid address validation token");
+                log_debug("invalid address validation token");
                 return;
             }
 
@@ -587,6 +589,8 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
             if (conn_io == NULL) {
                 return;
             }
+            started_at = getCurrentUsec();
+            dump_file("block_id,status,duration\n");
 
             memcpy(&conn_io->peer_addr, &peer_addr, peer_addr_len);
             conn_io->peer_addr_len = peer_addr_len;
@@ -600,7 +604,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents, int path) {
         }
 
         if (done < 0) {
-            // log_debug("failed to process packet: %zd", done);
+            log_debug("failed to process packet: %zd", done);
             return;
         }
 
@@ -728,7 +732,8 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
 
 static void dump_quiche_log(const char *line, void *argp)
 {
-    dump_file("%s\n", line);
+    dump_file("%s,%ld\n", line, getCurrentUsec() - started_at);
+    // log_debug("%s,%ld", line, getCurrentUsec() - started_at);
 }
 
 int main(int argc, char *argv[]) {
