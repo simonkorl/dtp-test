@@ -86,24 +86,25 @@ impl Scheduler for BasicScheduler {
         &mut self, blocks_vec: &mut Vec<Block>, _pacing_rate: f64, _rtt: f64,
         _next_packet_id: u64, _current_time: u64,
     ) -> u64 {
-        let mut len = -1;
-        if self.last_block_id.is_some() {
-            for block in blocks_vec.iter() {
-                if Some(block.block_id) == self.last_block_id {
-                    len = block.remaining_size as i128;
-                    break;
-                }
-            }
-        }
+        // let mut len = -1;
+        // if self.last_block_id.is_some() {
+        //     for block in blocks_vec.iter() {
+        //         if Some(block.block_id) == self.last_block_id {
+        //             len = block.remaining_size as i128;
+        //             break;
+        //         }
+        //     }
+        // }
 
-        if len <= 0 {
-            // begin new block transmittion
-            self.last_block_id = Some(blocks_vec[0].block_id);
-            return blocks_vec[0].block_id;
-        } else {
-            // tranport the last block
-            return self.last_block_id.clone().unwrap();
-        }
+        // if len <= 0 {
+        //     // begin new block transmittion
+        //     self.last_block_id = Some(blocks_vec[0].block_id);
+        //     return blocks_vec[0].block_id;
+        // } else {
+        //     // tranport the last block
+        //     return self.last_block_id.clone().unwrap();
+        // }
+        return blocks_vec[0].block_id;
     }
 }
 

@@ -329,20 +329,14 @@ impl StreamMap {
         } else {
             // let mut best_block_id: Option<u64> = None;
             let mut blocks_vec = vec![];
-            let mut peek_blocks_vec = vec![];
-            for i in (0..self.flushable.len()).rev() {
-                let &id = self.flushable.get(i).unwrap();
-                let block = self.get_block(id);
-                peek_blocks_vec.push(block);
-            }
-
-            self.scheduler.peek_through_flushable(
-                &mut peek_blocks_vec,
-                bandwidth,
-                rtt,
-                next_packet_id,
-                current_time,
-            );
+            // let mut peek_blocks_vec = vec![];
+            // for i in (0..self.flushable.len()).rev() {
+            //     let &id = self.flushable.get(i).unwrap();
+            //     let block = self.get_block(id);
+            //     peek_blocks_vec.push(block);
+            // }
+            
+            // self.scheduler.peek_through_flushable(&mut peek_blocks_vec, bandwidth, rtt, next_packet_id, current_time);
 
             for i in (0..self.flushable.len()).rev() {
                 let &id = self.flushable.get(i).unwrap();

@@ -2387,24 +2387,19 @@ impl Connection {
                     let mut temp_m = 0;
                     let mut temp_n = 0;
 
-                    if self.fec.is_empty() {
-                        let solution_redundancy = if self.tail_size.is_some()
-                            && self.tail_size != Some(0)
-                        {
-                            Connection::get_redundancy_rate(
-                                &block,
-                                self.init_redundancy_rate,
-                                rtt,
-                                bandwidth * 1024.0,
-                                now_time_ms as u64,
-                                self.recovery.lost_count,
-                                self.recovery.total_pkt_nums,
-                            )
-                        } else {
-                            0.0
-                        };
+                    if cfg!(feature="fec") && self.fec.is_empty() {
+                        let solution_redundancy = Connection::get_redundancy_rate(
+                            &block,
+                            self.init_redundancy_rate,
+                            rtt,
+                            bandwidth * 1024.0,
+                            now_time_ms as u64,
+                            self.recovery.lost_count,
+                            self.recovery.total_pkt_nums
+                        );
 
-                        if stream.send.len >= 1 {
+
+                        if stream.send.len >= 1{
                             temp_m = ((stream.send.len - 1) / 1350 + 1) as u8;
                             // ? why do we need to limit the max value of m ?
                             if temp_m >= 20 {
