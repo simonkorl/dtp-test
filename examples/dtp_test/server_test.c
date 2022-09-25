@@ -49,7 +49,7 @@ static struct argp_option options[] = {
     {"rate", 'r', "RATE", 0, "set redundancy rate"},
     {"cc-algorithm", 'a', "CC", 0, "set the cc algorithm ['reno', 'bbr', 'cubic']"},
     {"debug-level", 'L', "LEVEL", 0, "set debug logging level ['off', 'error', 'warn', 'info', 'debug', 'trace']"},
-    {"scheduler-algorithm", 's', "SCHEDULER", 0, "set scheduler algorithm ['fifo', 'dtp']"},
+    {"scheduler-algorithm", 's', "SCHEDULER", 0, "set scheduler algorithm ['basic', 'dtp']"},
     {0}
 };
 
