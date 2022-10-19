@@ -7,6 +7,8 @@ pub struct DtpScheduler {
     prio: u64,
     last_block_id: Option<u64>,
     max_prio: u64,
+    alpha: f64,
+    beta: f64,
 }
 
 impl Default for DtpScheduler {
@@ -16,7 +18,9 @@ impl Default for DtpScheduler {
             size: 0,
             prio: 999999999, // lowest priority
             last_block_id: None,
-            max_prio: 3,
+            max_prio: 2,
+            alpha: 0.5,
+            beta: 100000.0
         }
     }
 }
@@ -39,19 +43,19 @@ impl Scheduler for DtpScheduler {
         let mut size = 0;
         let mut prio = 0;
 
-        if self.last_block_id.is_some() {
-            for block in blocks_vec.iter() {
-                if Some(block.block_id) == self.last_block_id {
-                    len = block.remaining_size as i128;
-                    ddl = block.block_deadline;
-                    size = block.remaining_size;
-                    prio = block.block_priority;
-                    break;
-                }
-            }
-        }
+        // if self.last_block_id.is_some() {
+        //     for block in blocks_vec.iter() {
+        //         if Some(block.block_id) == self.last_block_id {
+        //             len = block.remaining_size as i128;
+        //             ddl = block.block_deadline;
+        //             size = block.remaining_size;
+        //             prio = block.block_priority;
+        //             break;
+        //         }
+        //     }
+        // }
 
-        if len <= 0 {
+        // if len <= 0 {
             for i in 0..blocks_vec.len() {
                 let block = &blocks_vec[i];
                 if block.remaining_size > 0 {
@@ -66,17 +70,26 @@ impl Scheduler for DtpScheduler {
                         - (tempsize as f64 / (pacing_rate * 1024.0)) * 1000.0; // Bytes / (KB/s) * 1000. (ms)
                     debug!("dtp scheduler: {{tempddl: {}, passed_time: {}, one_way_delay: {}, tempsize: {}, pacing_rate: {}, remaining_time: {}",
                             tempddl, passed_time, one_way_delay, tempsize, pacing_rate, remaining_time);
+                    
+                    let remaining_time_weight = 
+                        if remaining_time > 0.0 {
+                            remaining_time / tempddl as f64
+                        } else {
+                            1.0_f64.min(- remaining_time / tempddl as f64) + self.beta
+                        };
 
-                    if remaining_time >= 0.0 {
-                        let tempprio = block.block_priority;
-                        let weight: f64 = (1.0 * remaining_time / ddl as f64)
-                            / (1.0 - tempprio as f64 / self.max_prio as f64);
-                        if min_weight_block_id == -1
-                            || min_weight > weight
-                            || (min_weight == weight
-                                && block.remaining_size
-                                    < blocks_vec[min_weight_block_id as usize]
-                                        .remaining_size)
+                    let tempprio = block.block_priority;
+                    let unsent_ratio = tempsize as f64 / block.block_size as f64;
+                    let weight: f64 = (((1.0 - self.alpha) * remaining_time_weight) + 
+                        self.alpha * tempprio as f64 / self.max_prio as f64) * unsent_ratio;
+                    debug!("weight: ({} + {}) * {} = {}", ((1.0 - self.alpha) * remaining_time_weight), self.alpha * tempprio as f64 / self.max_prio as f64, unsent_ratio, weight);
+                    if min_weight_block_id == -1 ||
+                        min_weight > weight ||
+                        (min_weight == weight &&
+                            block.remaining_size <
+                            blocks_vec
+                            [min_weight_block_id as usize]
+                            .remaining_size)
                         {
                             min_weight_block_id = i as i32;
                             min_weight = weight;
@@ -84,10 +97,9 @@ impl Scheduler for DtpScheduler {
                             size = block.remaining_size;
                             prio = block.block_priority;
                         }
-                    }
                 }
             }
-        }
+        // }
 
         self.ddl = ddl;
         self.size = size;
@@ -98,8 +110,9 @@ impl Scheduler for DtpScheduler {
                 Some(blocks_vec[min_weight_block_id as usize].block_id);
             return blocks_vec[min_weight_block_id as usize].block_id;
         } else {
-            self.last_block_id = Some(blocks_vec[0].block_id);
-            return blocks_vec[0].block_id;
+            // self.last_block_id = Some(blocks_vec[0].block_id);
+            // return blocks_vec[0].block_id;
+            return self.last_block_id.unwrap();
         }
     }
 
